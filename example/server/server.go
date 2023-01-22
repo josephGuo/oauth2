@@ -13,14 +13,14 @@ import (
 	"os"
 	"time"
 
-	"github.com/go-oauth2/oauth2/v4/generates"
+	"github.com/josephGuo/oauth2/generates"
 
-	"github.com/go-oauth2/oauth2/v4/errors"
-	"github.com/go-oauth2/oauth2/v4/manage"
-	"github.com/go-oauth2/oauth2/v4/models"
-	"github.com/go-oauth2/oauth2/v4/server"
-	"github.com/go-oauth2/oauth2/v4/store"
 	"github.com/go-session/session"
+	"github.com/josephGuo/oauth2/errors"
+	"github.com/josephGuo/oauth2/manage"
+	"github.com/josephGuo/oauth2/models"
+	"github.com/josephGuo/oauth2/server"
+	"github.com/josephGuo/oauth2/store"
 )
 
 var (
