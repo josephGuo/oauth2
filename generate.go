@@ -2,8 +2,9 @@ package oauth2
 
 import (
 	"context"
-	"net/http"
 	"time"
+
+	"github.com/cloudwego/hertz/pkg/protocol"
 )
 
 type (
@@ -13,7 +14,7 @@ type (
 		UserID    string
 		CreateAt  time.Time
 		TokenInfo TokenInfo
-		Request   *http.Request
+		Request   *protocol.Request
 	}
 
 	// AuthorizeGenerate generate the authorization code interface

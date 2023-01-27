@@ -2,8 +2,9 @@ package oauth2
 
 import (
 	"context"
-	"net/http"
 	"time"
+
+	"github.com/cloudwego/hertz/pkg/protocol"
 )
 
 // TokenGenerateRequest provide to generate the token request parameters
@@ -19,7 +20,7 @@ type TokenGenerateRequest struct {
 	Refresh             string
 	CodeVerifier        string
 	AccessTokenExp      time.Duration
-	Request             *http.Request
+	Request             *protocol.Request
 }
 
 // Manager authorization management interface

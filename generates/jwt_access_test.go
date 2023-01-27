@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang-jwt/jwt"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/josephGuo/oauth2"
 	"github.com/josephGuo/oauth2/generates"
 	"github.com/josephGuo/oauth2/models"

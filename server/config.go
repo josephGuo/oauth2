@@ -1,9 +1,9 @@
 package server
 
 import (
-	"net/http"
 	"time"
 
+	"github.com/cloudwego/hertz/pkg/protocol"
 	"github.com/josephGuo/oauth2"
 )
 
@@ -46,5 +46,5 @@ type AuthorizeRequest struct {
 	CodeChallenge       string
 	CodeChallengeMethod oauth2.CodeChallengeMethod
 	AccessTokenExp      time.Duration
-	Request             *http.Request
+	Request             *protocol.Request
 }

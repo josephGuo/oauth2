@@ -8,6 +8,9 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/cloudwego/hertz/pkg/app"
+	"github.com/cloudwego/hertz/pkg/common/adaptor"
+	"github.com/cloudwego/hertz/pkg/protocol"
 	"github.com/gavv/httpexpect/v2"
 	"github.com/josephGuo/oauth2"
 	"github.com/josephGuo/oauth2/errors"
@@ -47,14 +50,19 @@ func clientStore(domain string) oauth2.ClientStore {
 }
 
 func testServer(t *testing.T, w http.ResponseWriter, r *http.Request) {
+	hreq := new(protocol.Request)
+	adaptor.CopyToHertzRequest(r, hreq)
+	ctx := app.NewContext(256)
+	hreq.CopyTo(&ctx.Request)
+	c := context.Background()
 	switch r.URL.Path {
 	case "/authorize":
-		err := srv.HandleAuthorizeRequest(w, r)
+		err := srv.HandleAuthorizeRequest(c, ctx)
 		if err != nil {
 			t.Error(err)
 		}
 	case "/token":
-		err := srv.HandleTokenRequest(w, r)
+		err := srv.HandleTokenRequest(c, ctx)
 		if err != nil {
 			t.Error(err)
 		}
@@ -97,7 +105,7 @@ func TestAuthorizeCode(t *testing.T) {
 
 	manager.MapClientStorage(clientStore(csrv.URL))
 	srv = server.NewDefaultServer(manager)
-	srv.SetUserAuthorizationHandler(func(w http.ResponseWriter, r *http.Request) (userID string, err error) {
+	srv.SetUserAuthorizationHandler(func(c context.Context, ctx *app.RequestContext) (userID string, err error) {
 		userID = "000000"
 		return
 	})
@@ -148,7 +156,7 @@ func TestAuthorizeCodeWithChallengePlain(t *testing.T) {
 
 	manager.MapClientStorage(clientStore(csrv.URL))
 	srv = server.NewDefaultServer(manager)
-	srv.SetUserAuthorizationHandler(func(w http.ResponseWriter, r *http.Request) (userID string, err error) {
+	srv.SetUserAuthorizationHandler(func(c context.Context, ctx *app.RequestContext) (userID string, err error) {
 		userID = "000000"
 		return
 	})
@@ -200,7 +208,7 @@ func TestAuthorizeCodeWithChallengeS256(t *testing.T) {
 
 	manager.MapClientStorage(clientStore(csrv.URL))
 	srv = server.NewDefaultServer(manager)
-	srv.SetUserAuthorizationHandler(func(w http.ResponseWriter, r *http.Request) (userID string, err error) {
+	srv.SetUserAuthorizationHandler(func(c context.Context, ctx *app.RequestContext) (userID string, err error) {
 		userID = "000000"
 		return
 	})
@@ -228,7 +236,7 @@ func TestImplicit(t *testing.T) {
 
 	manager.MapClientStorage(clientStore(csrv.URL))
 	srv = server.NewDefaultServer(manager)
-	srv.SetUserAuthorizationHandler(func(w http.ResponseWriter, r *http.Request) (userID string, err error) {
+	srv.SetUserAuthorizationHandler(func(c context.Context, ctx *app.RequestContext) (userID string, err error) {
 		userID = "000000"
 		return
 	})
@@ -304,7 +312,7 @@ func TestClientCredentials(t *testing.T) {
 		}
 		return
 	})
-	srv.SetAuthorizeScopeHandler(func(w http.ResponseWriter, r *http.Request) (scope string, err error) {
+	srv.SetAuthorizeScopeHandler(func(c context.Context, ctx *app.RequestContext) (scope string, err error) {
 		return
 	})
 	srv.SetClientScopeHandler(func(tgr *oauth2.TokenGenerateRequest) (allowed bool, err error) {
@@ -374,7 +382,7 @@ func TestRefreshing(t *testing.T) {
 
 	manager.MapClientStorage(clientStore(csrv.URL))
 	srv = server.NewDefaultServer(manager)
-	srv.SetUserAuthorizationHandler(func(w http.ResponseWriter, r *http.Request) (userID string, err error) {
+	srv.SetUserAuthorizationHandler(func(c context.Context, ctx *app.RequestContext) (userID string, err error) {
 		userID = "000000"
 		return
 	})
@@ -393,8 +401,11 @@ func validationAccessToken(t *testing.T, accessToken string) {
 	req := httptest.NewRequest("GET", "http://example.com", nil)
 
 	req.Header.Set("Authorization", "Bearer "+accessToken)
+	hreq := new(protocol.Request)
+	adaptor.CopyToHertzRequest(req, hreq)
 
-	ti, err := srv.ValidationBearerToken(req)
+	c := context.Background()
+	ti, err := srv.ValidationBearerToken(c, hreq)
 	if err != nil {
 		t.Error(err.Error())
 		return
