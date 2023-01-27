@@ -40,7 +40,7 @@ func (ts *TokenStore) Create(ctx context.Context, info oauth2.TokenInfo) error {
 
 	return ts.db.Update(func(tx *buntdb.Tx) error {
 		if code := info.GetCode(); code != "" {
-			_, _, err := tx.Set(code, string(jv), &buntdb.SetOptions{Expires: true, TTL: info.GetCodeExpiresIn()})
+			_, _, err := tx.Set(code, oauth2.B2s(jv), &buntdb.SetOptions{Expires: true, TTL: info.GetCodeExpiresIn()})
 			return err
 		}
 
@@ -60,7 +60,7 @@ func (ts *TokenStore) Create(ctx context.Context, info oauth2.TokenInfo) error {
 			}
 		}
 
-		_, _, err := tx.Set(basicID, string(jv), &buntdb.SetOptions{Expires: expires, TTL: rexp})
+		_, _, err := tx.Set(basicID, oauth2.B2s(jv), &buntdb.SetOptions{Expires: expires, TTL: rexp})
 		if err != nil {
 			return err
 		}

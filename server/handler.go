@@ -6,14 +6,13 @@ import (
 	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
-	"github.com/cloudwego/hertz/pkg/protocol"
 	"github.com/josephGuo/oauth2"
 	"github.com/josephGuo/oauth2/errors"
 )
 
 type (
 	// ClientInfoHandler get client info from request
-	ClientInfoHandler func(r *protocol.Request) (clientID, clientSecret string, err error)
+	ClientInfoHandler func(ctx *app.RequestContext) (clientID, clientSecret string, err error)
 
 	// ClientAuthorizedHandler check the client allows to use this authorization grant type
 	ClientAuthorizedHandler func(clientID string, grant oauth2.GrantType) (allowed bool, err error)
@@ -56,18 +55,18 @@ type (
 )
 
 // ClientFormHandler get client data from form
-func ClientFormHandler(r *protocol.Request) (string, string, error) {
-	clientID := string(r.URI().QueryArgs().Peek("client_id"))
+func ClientFormHandler(ctx *app.RequestContext) (string, string, error) {
+	clientID := oauth2.B2s(ctx.FormValue("client_id"))
 	if clientID == "" {
 		return "", "", errors.ErrInvalidClient
 	}
-	clientSecret := string(r.URI().QueryArgs().Peek("client_secret"))
+	clientSecret := oauth2.B2s(ctx.FormValue("client_secret"))
 	return clientID, clientSecret, nil
 }
 
 // ClientBasicHandler get client data from basic authorization
-func ClientBasicHandler(r *protocol.Request) (string, string, error) {
-	username, password, ok := r.BasicAuth()
+func ClientBasicHandler(ctx *app.RequestContext) (string, string, error) {
+	username, password, ok := ctx.Request.BasicAuth()
 	if !ok {
 		return "", "", errors.ErrInvalidClient
 	}

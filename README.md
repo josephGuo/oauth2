@@ -185,10 +185,10 @@ if !ok || !token.Valid {
 
 Copyright (c) 2016 Lyric
 
-[build-status-url]: https://travis-ci.org/go-oauth2/oauth2
-[build-status-image]: https://travis-ci.org/go-oauth2/oauth2.svg?branch=master
-[codecov-url]: https://codecov.io/gh/go-oauth2/oauth2
-[codecov-image]: https://codecov.io/gh/go-oauth2/oauth2/branch/master/graph/badge.svg
+[build-status-url]: https://travis-ci.org/josephGuo/oauth2
+[build-status-image]: https://travis-ci.org/josephGuo/oauth2.svg?branch=master
+[codecov-url]: https://codecov.io/gh/josephGuo/oauth2
+[codecov-image]: https://codecov.io/gh/josephGuo/oauth2/branch/master/graph/badge.svg
 [reportcard-url]: https://goreportcard.com/report/github.com/josephGuo/oauth2
 [reportcard-image]: https://goreportcard.com/badge/github.com/josephGuo/oauth2
 [godoc-url]: https://godoc.org/github.com/josephGuo/oauth2

@@ -75,7 +75,7 @@ func TestAuthorizeCode(t *testing.T) {
 	}))
 	defer tsrv.Close()
 
-	e := httpexpect.New(t, tsrv.URL)
+	e := httpexpect.Default(t, tsrv.URL)
 
 	csrv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -125,7 +125,7 @@ func TestAuthorizeCodeWithChallengePlain(t *testing.T) {
 	}))
 	defer tsrv.Close()
 
-	e := httpexpect.New(t, tsrv.URL)
+	e := httpexpect.Default(t, tsrv.URL)
 
 	csrv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -177,7 +177,7 @@ func TestAuthorizeCodeWithChallengeS256(t *testing.T) {
 	}))
 	defer tsrv.Close()
 
-	e := httpexpect.New(t, tsrv.URL)
+	e := httpexpect.Default(t, tsrv.URL)
 
 	csrv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -229,7 +229,7 @@ func TestImplicit(t *testing.T) {
 		testServer(t, w, r)
 	}))
 	defer tsrv.Close()
-	e := httpexpect.New(t, tsrv.URL)
+	e := httpexpect.Default(t, tsrv.URL)
 
 	csrv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	defer csrv.Close()
@@ -255,7 +255,7 @@ func TestPasswordCredentials(t *testing.T) {
 		testServer(t, w, r)
 	}))
 	defer tsrv.Close()
-	e := httpexpect.New(t, tsrv.URL)
+	e := httpexpect.Default(t, tsrv.URL)
 
 	manager.MapClientStorage(clientStore(""))
 	srv = server.NewDefaultServer(manager)
@@ -288,7 +288,7 @@ func TestClientCredentials(t *testing.T) {
 		testServer(t, w, r)
 	}))
 	defer tsrv.Close()
-	e := httpexpect.New(t, tsrv.URL)
+	e := httpexpect.Default(t, tsrv.URL)
 
 	manager.MapClientStorage(clientStore(""))
 
@@ -339,7 +339,7 @@ func TestRefreshing(t *testing.T) {
 		testServer(t, w, r)
 	}))
 	defer tsrv.Close()
-	e := httpexpect.New(t, tsrv.URL)
+	e := httpexpect.Default(t, tsrv.URL)
 
 	csrv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -398,14 +398,13 @@ func TestRefreshing(t *testing.T) {
 
 // validation access token
 func validationAccessToken(t *testing.T, accessToken string) {
-	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req := protocol.NewRequest("GET", "http://example.com", nil)
 
 	req.Header.Set("Authorization", "Bearer "+accessToken)
-	hreq := new(protocol.Request)
-	adaptor.CopyToHertzRequest(req, hreq)
-
+	ctx := app.NewContext(256)
+	req.CopyTo(&ctx.Request)
 	c := context.Background()
-	ti, err := srv.ValidationBearerToken(c, hreq)
+	ti, err := srv.ValidationBearerToken(c, ctx)
 	if err != nil {
 		t.Error(err.Error())
 		return

@@ -81,7 +81,7 @@ func main() {
 	srv.SetResponseErrorHandler(func(re *errors.Response) {
 		log.Println("Response Error:", re.Error.Error())
 	})
-	h := hertzServer.Default(hertzServer.WithHostPorts("127.0.0.1:8000"), hertzServer.WithExitWaitTime(3*time.Second))
+	h := hertzServer.Default(hertzServer.WithHostPorts("127.0.0.1:9096"), hertzServer.WithExitWaitTime(3*time.Second))
 	h.Use(fastsession.NewHertzSession("memory", "oauth2server_hertz_id"))
 	h.LoadHTMLGlob("./static/*")
 	h.Any("/login", loginHandler)
@@ -136,7 +136,7 @@ func main() {
 		if dumpvar {
 			_ = dumpRequest(os.Stdout, "test", r) // Ignore the error
 		}
-		token, err := srv.ValidationBearerToken(c, &ctx.Request)
+		token, err := srv.ValidationBearerToken(c, ctx)
 		if err != nil {
 			//http.Error(w, err.Error(), http.StatusBadRequest)
 			ctx.AbortWithError(http.StatusBadRequest, err)

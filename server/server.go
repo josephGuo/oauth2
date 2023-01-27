@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
-	"github.com/cloudwego/hertz/pkg/protocol"
 	"github.com/josephGuo/oauth2"
 	"github.com/josephGuo/oauth2/errors"
 )
@@ -168,9 +167,9 @@ func (s *Server) CheckCodeChallengeMethod(ccm oauth2.CodeChallengeMethod) bool {
 
 // ValidationAuthorizeRequest the authorization request validation
 func (s *Server) ValidationAuthorizeRequest(r *app.RequestContext) (*AuthorizeRequest, error) {
-	redirectURI := string(r.FormValue("redirect_uri"))
-	clientID := string(r.FormValue("client_id"))
-	method := string(r.Method())
+	redirectURI := oauth2.B2s(r.FormValue("redirect_uri"))
+	clientID := oauth2.B2s(r.FormValue("client_id"))
+	method := oauth2.B2s(r.Method())
 	if !(method == "GET" || method == "POST") ||
 		clientID == "" {
 		return nil, errors.ErrInvalidRequest
@@ -183,7 +182,7 @@ func (s *Server) ValidationAuthorizeRequest(r *app.RequestContext) (*AuthorizeRe
 		return nil, errors.ErrUnauthorizedClient
 	}
 
-	cc := string(r.FormValue("code_challenge"))
+	cc := oauth2.B2s(r.FormValue("code_challenge"))
 	if cc == "" && s.Config.ForcePKCE {
 		return nil, errors.ErrCodeChallengeRquired
 	}
@@ -204,8 +203,8 @@ func (s *Server) ValidationAuthorizeRequest(r *app.RequestContext) (*AuthorizeRe
 		RedirectURI:         redirectURI,
 		ResponseType:        resType,
 		ClientID:            clientID,
-		State:               string(r.FormValue("state")),
-		Scope:               string(r.FormValue("scope")),
+		State:               oauth2.B2s(r.FormValue("state")),
+		Scope:               oauth2.B2s(r.FormValue("scope")),
 		Request:             &(r.Request),
 		CodeChallenge:       cc,
 		CodeChallengeMethod: ccm,
@@ -319,7 +318,7 @@ func (s *Server) HandleAuthorizeRequest(c context.Context, ctx *app.RequestConte
 
 // ValidationTokenRequest the token request validation
 func (s *Server) ValidationTokenRequest(c context.Context, r *app.RequestContext) (oauth2.GrantType, *oauth2.TokenGenerateRequest, error) {
-	if v := string(r.Method()); !(v == "POST" ||
+	if v := oauth2.B2s(r.Method()); !(v == "POST" ||
 		(s.Config.AllowGetAccessRequest && v == "GET")) {
 		return "", nil, errors.ErrInvalidRequest
 	}
@@ -329,7 +328,7 @@ func (s *Server) ValidationTokenRequest(c context.Context, r *app.RequestContext
 		return "", nil, errors.ErrUnsupportedGrantType
 	}
 
-	clientID, clientSecret, err := s.ClientInfoHandler(&(r.Request))
+	clientID, clientSecret, err := s.ClientInfoHandler(r)
 	if err != nil {
 		return "", nil, err
 	}
@@ -342,19 +341,19 @@ func (s *Server) ValidationTokenRequest(c context.Context, r *app.RequestContext
 
 	switch gt {
 	case oauth2.AuthorizationCode:
-		tgr.RedirectURI = string(r.FormValue("redirect_uri"))
-		tgr.Code = string(r.FormValue("code"))
+		tgr.RedirectURI = oauth2.B2s(r.FormValue("redirect_uri"))
+		tgr.Code = oauth2.B2s(r.FormValue("code"))
 		if tgr.RedirectURI == "" ||
 			tgr.Code == "" {
 			return "", nil, errors.ErrInvalidRequest
 		}
-		tgr.CodeVerifier = string(r.FormValue("code_verifier"))
+		tgr.CodeVerifier = oauth2.B2s(r.FormValue("code_verifier"))
 		if s.Config.ForcePKCE && tgr.CodeVerifier == "" {
 			return "", nil, errors.ErrInvalidRequest
 		}
 	case oauth2.PasswordCredentials:
-		tgr.Scope = string(r.FormValue("scope"))
-		username, password := string(r.FormValue("username")), string(r.FormValue("password"))
+		tgr.Scope = oauth2.B2s(r.FormValue("scope"))
+		username, password := oauth2.B2s(r.FormValue("username")), oauth2.B2s(r.FormValue("password"))
 		if username == "" || password == "" {
 			return "", nil, errors.ErrInvalidRequest
 		}
@@ -367,10 +366,10 @@ func (s *Server) ValidationTokenRequest(c context.Context, r *app.RequestContext
 		}
 		tgr.UserID = userID
 	case oauth2.ClientCredentials:
-		tgr.Scope = string(r.FormValue("scope"))
+		tgr.Scope = oauth2.B2s(r.FormValue("scope"))
 	case oauth2.Refreshing:
-		tgr.Refresh = string(r.FormValue("refresh_token"))
-		tgr.Scope = string(r.FormValue("scope"))
+		tgr.Refresh = oauth2.B2s(r.FormValue("refresh_token"))
+		tgr.Scope = oauth2.B2s(r.FormValue("scope"))
 		if tgr.Refresh == "" {
 			return "", nil, errors.ErrInvalidRequest
 		}
@@ -571,15 +570,15 @@ func (s *Server) GetErrorData(err error) (map[string]interface{}, int, http.Head
 }
 
 // BearerAuth parse bearer token
-func (s *Server) BearerAuth(r *protocol.Request) (string, bool) {
-	auth := r.Header.Get("Authorization")
+func (s *Server) BearerAuth(ctx *app.RequestContext) (string, bool) {
+	auth := ctx.Request.Header.Get("Authorization")
 	prefix := "Bearer "
 	token := ""
 
 	if auth != "" && strings.HasPrefix(auth, prefix) {
 		token = auth[len(prefix):]
 	} else {
-		token = string(r.PostArgs().Peek("access_token"))
+		token = oauth2.B2s(ctx.FormValue("access_token"))
 	}
 
 	return token, token != ""
@@ -587,11 +586,11 @@ func (s *Server) BearerAuth(r *protocol.Request) (string, bool) {
 
 // ValidationBearerToken validation the bearer tokens
 // https://tools.ietf.org/html/rfc6750
-func (s *Server) ValidationBearerToken(ctx context.Context, r *protocol.Request) (oauth2.TokenInfo, error) {
-	accessToken, ok := s.BearerAuth(r)
+func (s *Server) ValidationBearerToken(c context.Context, ctx *app.RequestContext) (oauth2.TokenInfo, error) {
+	accessToken, ok := s.BearerAuth(ctx)
 	if !ok {
 		return nil, errors.ErrInvalidAccessToken
 	}
 
-	return s.Manager.LoadAccessToken(ctx, accessToken)
+	return s.Manager.LoadAccessToken(c, accessToken)
 }

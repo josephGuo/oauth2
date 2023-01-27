@@ -26,9 +26,9 @@ func NewResponse(err error, statusCode int) *Response {
 // SetHeader sets the header entries associated with key to
 // the single element value.
 func (r *Response) SetHeader(key, value string) {
-	// if r.Header == nil {
-	// 	r.Header = make(http.Header)
-	// }
+	if r.Header == nil {
+		r.Header = make(http.Header)
+	}
 	r.Header.Set(key, value)
 }
 
