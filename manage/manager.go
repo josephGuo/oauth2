@@ -163,7 +163,7 @@ func (m *Manager) GenerateAuthToken(ctx context.Context, rt oauth2.ResponseType,
 		UserID:    tgr.UserID,
 		CreateAt:  createAt,
 		TokenInfo: ti,
-		Request:   tgr.Request,
+		//Request:   tgr.Request,
 	}
 	switch rt {
 	case oauth2.Code:
@@ -218,7 +218,7 @@ func (m *Manager) GenerateAuthToken(ctx context.Context, rt oauth2.ResponseType,
 	}
 	return ti, nil
 }
- 
+
 // get authorization code data
 func (m *Manager) getAuthorizationCode(ctx context.Context, code string) (oauth2.TokenInfo, error) {
 	ti, err := m.tokenStore.GetByCode(ctx, code)
@@ -377,7 +377,7 @@ func (m *Manager) RefreshAccessToken(ctx context.Context, tgr *oauth2.TokenGener
 		UserID:    ti.GetUserID(),
 		CreateAt:  time.Now(),
 		TokenInfo: ti,
-		Request:   tgr.Request,
+		//Request:   tgr.Request,
 	}
 
 	rcfg := DefaultRefreshTokenCfg

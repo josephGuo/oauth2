@@ -6,9 +6,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
+	hertz "github.com/cloudwego/hertz/pkg/app/server"
 	"github.com/cloudwego/hertz/pkg/common/adaptor"
 	"github.com/cloudwego/hertz/pkg/protocol"
 	"github.com/gavv/httpexpect/v2"
@@ -50,10 +53,8 @@ func clientStore(domain string) oauth2.ClientStore {
 }
 
 func testServer(t *testing.T, w http.ResponseWriter, r *http.Request) {
-	hreq := new(protocol.Request)
-	adaptor.CopyToHertzRequest(r, hreq)
 	ctx := app.NewContext(256)
-	hreq.CopyTo(&ctx.Request)
+	adaptor.CopyToHertzRequest(r, &ctx.Request)
 	c := context.Background()
 	switch r.URL.Path {
 	case "/authorize":
@@ -67,6 +68,7 @@ func testServer(t *testing.T, w http.ResponseWriter, r *http.Request) {
 			t.Error(err)
 		}
 	}
+	responseWriter(w, &ctx.Response)
 }
 
 func TestAuthorizeCode(t *testing.T) {
@@ -74,7 +76,6 @@ func TestAuthorizeCode(t *testing.T) {
 		testServer(t, w, r)
 	}))
 	defer tsrv.Close()
-
 	e := httpexpect.Default(t, tsrv.URL)
 
 	csrv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -124,7 +125,6 @@ func TestAuthorizeCodeWithChallengePlain(t *testing.T) {
 		testServer(t, w, r)
 	}))
 	defer tsrv.Close()
-
 	e := httpexpect.Default(t, tsrv.URL)
 
 	csrv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -176,7 +176,6 @@ func TestAuthorizeCodeWithChallengeS256(t *testing.T) {
 		testServer(t, w, r)
 	}))
 	defer tsrv.Close()
-
 	e := httpexpect.Default(t, tsrv.URL)
 
 	csrv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -251,11 +250,16 @@ func TestImplicit(t *testing.T) {
 }
 
 func TestPasswordCredentials(t *testing.T) {
-	tsrv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		testServer(t, w, r)
-	}))
-	defer tsrv.Close()
-	e := httpexpect.Default(t, tsrv.URL)
+	// tsrv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	// 	testServer(t, w, r)
+	// }))
+	// defer tsrv.Close()
+	// e := httpexpect.Default(t, tsrv.URL)
+
+	hertz := newhertzServer(t)
+	defer hertz.Close()
+	url := "http://" + hertz.Engine.GetOptions().Addr
+	e := httpexpect.Default(t, url)
 
 	manager.MapClientStorage(clientStore(""))
 	srv = server.NewDefaultServer(manager)
@@ -275,20 +279,22 @@ func TestPasswordCredentials(t *testing.T) {
 		WithFormField("scope", "all").
 		WithBasicAuth(clientID, clientSecret).
 		Expect().
-		Status(http.StatusOK).
-		JSON().Object()
+		Status(http.StatusOK).JSON().Object()
 
 	t.Logf("%#v\n", resObj.Raw())
-
 	validationAccessToken(t, resObj.Value("access_token").String().Raw())
 }
 
 func TestClientCredentials(t *testing.T) {
-	tsrv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		testServer(t, w, r)
-	}))
-	defer tsrv.Close()
-	e := httpexpect.Default(t, tsrv.URL)
+	// tsrv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	// 	testServer(t, w, r)
+	// }))
+	// defer tsrv.Close()
+	// e := httpexpect.Default(t, tsrv.URL)
+	hertz := newhertzServer(t)
+	defer hertz.Close()
+	url := "http://" + hertz.Engine.GetOptions().Addr
+	e := httpexpect.Default(t, url)
 
 	manager.MapClientStorage(clientStore(""))
 
@@ -398,10 +404,11 @@ func TestRefreshing(t *testing.T) {
 
 // validation access token
 func validationAccessToken(t *testing.T, accessToken string) {
+	ctx := app.NewContext(0)
 	req := protocol.NewRequest("GET", "http://example.com", nil)
+	req.SetAuthToken(accessToken)
+	//req.Header.Set("Authorization", "Bearer "+accessToken)
 
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	ctx := app.NewContext(256)
 	req.CopyTo(&ctx.Request)
 	c := context.Background()
 	ti, err := srv.ValidationBearerToken(c, ctx)
@@ -412,4 +419,39 @@ func validationAccessToken(t *testing.T, accessToken string) {
 	if ti.GetClientID() != clientID {
 		t.Error("invalid access token")
 	}
+}
+
+func newhertzServer(t *testing.T) *hertz.Hertz {
+	httpServer := hertz.New(hertz.WithHostPorts("127.0.0.1:8765")) //hertz.Default() //
+	httpServer.Any("/authorize", func(c context.Context, ctx *app.RequestContext) {
+		err := srv.HandleAuthorizeRequest(c, ctx)
+		if err != nil {
+			t.Error(err)
+		}
+	})
+	httpServer.Any("/token", func(c context.Context, ctx *app.RequestContext) {
+		err := srv.HandleTokenRequest(c, ctx)
+		if err != nil {
+			t.Error(err)
+		}
+	})
+
+	testint := uint32(0)
+	httpServer.Engine.OnShutdown = append(httpServer.OnShutdown, func(ctx context.Context) {
+		atomic.StoreUint32(&testint, 1)
+	})
+
+	go httpServer.Spin()
+
+	time.Sleep(500 * time.Millisecond)
+
+	return httpServer
+}
+
+func responseWriter(writer http.ResponseWriter, response *protocol.Response) {
+	response.Header.VisitAll(func(k, v []byte) {
+		writer.Header().Set(string(k), string(v))
+	})
+	writer.Write(response.Body())
+	writer.WriteHeader(200)
 }
