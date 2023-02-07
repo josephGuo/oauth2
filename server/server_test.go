@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -32,9 +31,10 @@ var (
 	clientSecret = "11111111"
 
 	plainChallenge = "ThisIsAFourtyThreeCharactersLongStringThing"
-	s256Challenge  = "s256test"
-	// echo s256test | sha256 | base64 | tr '/+' '_-'
-	s256ChallengeHash = "W6YWc_4yHwYN-cGDgGmOMHF3l7KDy7VcRjf7q2FVF-o="
+	s256Challenge  = "s256tests256tests256tests256tests256tests256test"
+	// sha2562 := sha256.Sum256([]byte(s256Challenge))
+	// fmt.Printf(base64.URLEncoding.EncodeToString(sha2562[:]))
+	s256ChallengeHash = "To2Xqv01cm16bC9Sf7KRRS8CO2SFss_HSMQOr3sdCDE="
 )
 
 func init() {
@@ -42,12 +42,19 @@ func init() {
 	manager.MustTokenStorage(store.NewMemoryTokenStore())
 }
 
-func clientStore(domain string) oauth2.ClientStore {
+func clientStore(domain string, public bool) oauth2.ClientStore {
 	clientStore := store.NewClientStore()
+	var secret string
+	if public {
+		secret = ""
+	} else {
+		secret = clientSecret
+	}
 	clientStore.Set(clientID, &models.Client{
 		ID:     clientID,
-		Secret: clientSecret,
+		Secret: secret,
 		Domain: domain,
+		Public: public,
 	})
 	return clientStore
 }
@@ -104,7 +111,7 @@ func TestAuthorizeCode(t *testing.T) {
 	}))
 	defer csrv.Close()
 
-	manager.MapClientStorage(clientStore(csrv.URL))
+	manager.MapClientStorage(clientStore(csrv.URL, true))
 	srv = server.NewDefaultServer(manager)
 	srv.SetUserAuthorizationHandler(func(c context.Context, ctx *app.RequestContext) (userID string, err error) {
 		userID = "000000"
@@ -116,7 +123,7 @@ func TestAuthorizeCode(t *testing.T) {
 		WithQuery("client_id", clientID).
 		WithQuery("scope", "all").
 		WithQuery("state", "123").
-		WithQuery("redirect_uri", url.QueryEscape(csrv.URL+"/oauth2")).
+		WithQuery("redirect_uri", csrv.URL+"/oauth2").
 		Expect().Status(http.StatusOK)
 }
 
@@ -142,7 +149,7 @@ func TestAuthorizeCodeWithChallengePlain(t *testing.T) {
 				WithFormField("grant_type", "authorization_code").
 				WithFormField("client_id", clientID).
 				WithFormField("code", code).
-				WithBasicAuth("code_verifier", "testchallenge").
+				WithFormField("code_verifier", plainChallenge).
 				Expect().
 				Status(http.StatusOK).
 				JSON().Object()
@@ -154,19 +161,20 @@ func TestAuthorizeCodeWithChallengePlain(t *testing.T) {
 	}))
 	defer csrv.Close()
 
-	manager.MapClientStorage(clientStore(csrv.URL))
+	manager.MapClientStorage(clientStore(csrv.URL, true))
 	srv = server.NewDefaultServer(manager)
 	srv.SetUserAuthorizationHandler(func(c context.Context, ctx *app.RequestContext) (userID string, err error) {
 		userID = "000000"
 		return
 	})
+	srv.SetClientInfoHandler(server.ClientFormHandler)
 
 	e.GET("/authorize").
 		WithQuery("response_type", "code").
 		WithQuery("client_id", clientID).
 		WithQuery("scope", "all").
 		WithQuery("state", "123").
-		WithQuery("redirect_uri", url.QueryEscape(csrv.URL+"/oauth2")).
+		WithQuery("redirect_uri", csrv.URL+"/oauth2").
 		WithQuery("code_challenge", plainChallenge).
 		Expect().Status(http.StatusOK)
 }
@@ -193,7 +201,7 @@ func TestAuthorizeCodeWithChallengeS256(t *testing.T) {
 				WithFormField("grant_type", "authorization_code").
 				WithFormField("client_id", clientID).
 				WithFormField("code", code).
-				WithBasicAuth("code_verifier", s256Challenge).
+				WithFormField("code_verifier", s256Challenge).
 				Expect().
 				Status(http.StatusOK).
 				JSON().Object()
@@ -205,19 +213,20 @@ func TestAuthorizeCodeWithChallengeS256(t *testing.T) {
 	}))
 	defer csrv.Close()
 
-	manager.MapClientStorage(clientStore(csrv.URL))
+	manager.MapClientStorage(clientStore(csrv.URL, true))
 	srv = server.NewDefaultServer(manager)
 	srv.SetUserAuthorizationHandler(func(c context.Context, ctx *app.RequestContext) (userID string, err error) {
 		userID = "000000"
 		return
 	})
+	srv.SetClientInfoHandler(server.ClientFormHandler)
 
 	e.GET("/authorize").
 		WithQuery("response_type", "code").
 		WithQuery("client_id", clientID).
 		WithQuery("scope", "all").
 		WithQuery("state", "123").
-		WithQuery("redirect_uri", url.QueryEscape(csrv.URL+"/oauth2")).
+		WithQuery("redirect_uri", csrv.URL+"/oauth2").
 		WithQuery("code_challenge", s256ChallengeHash).
 		WithQuery("code_challenge_method", "S256").
 		Expect().Status(http.StatusOK)
@@ -233,7 +242,7 @@ func TestImplicit(t *testing.T) {
 	csrv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	defer csrv.Close()
 
-	manager.MapClientStorage(clientStore(csrv.URL))
+	manager.MapClientStorage(clientStore(csrv.URL, false))
 	srv = server.NewDefaultServer(manager)
 	srv.SetUserAuthorizationHandler(func(c context.Context, ctx *app.RequestContext) (userID string, err error) {
 		userID = "000000"
@@ -245,7 +254,7 @@ func TestImplicit(t *testing.T) {
 		WithQuery("client_id", clientID).
 		WithQuery("scope", "all").
 		WithQuery("state", "123").
-		WithQuery("redirect_uri", url.QueryEscape(csrv.URL+"/oauth2")).
+		WithQuery("redirect_uri", csrv.URL+"/oauth2").
 		Expect().Status(http.StatusOK)
 }
 
@@ -261,7 +270,7 @@ func TestPasswordCredentials(t *testing.T) {
 	url := "http://" + hertz.Engine.GetOptions().Addr
 	e := httpexpect.Default(t, url)
 
-	manager.MapClientStorage(clientStore(""))
+	manager.MapClientStorage(clientStore("", false))
 	srv = server.NewDefaultServer(manager)
 	srv.SetPasswordAuthorizationHandler(func(ctx context.Context, clientID, username, password string) (userID string, err error) {
 		if username == "admin" && password == "123456" {
@@ -279,7 +288,8 @@ func TestPasswordCredentials(t *testing.T) {
 		WithFormField("scope", "all").
 		WithBasicAuth(clientID, clientSecret).
 		Expect().
-		Status(http.StatusOK).JSON().Object()
+		Status(http.StatusOK).
+		JSON().Object()
 
 	t.Logf("%#v\n", resObj.Raw())
 	validationAccessToken(t, resObj.Value("access_token").String().Raw())
@@ -296,7 +306,7 @@ func TestClientCredentials(t *testing.T) {
 	url := "http://" + hertz.Engine.GetOptions().Addr
 	e := httpexpect.Default(t, url)
 
-	manager.MapClientStorage(clientStore(""))
+	manager.MapClientStorage(clientStore("", false))
 
 	srv = server.NewDefaultServer(manager)
 	srv.SetClientInfoHandler(server.ClientFormHandler)
@@ -386,7 +396,7 @@ func TestRefreshing(t *testing.T) {
 	}))
 	defer csrv.Close()
 
-	manager.MapClientStorage(clientStore(csrv.URL))
+	manager.MapClientStorage(clientStore(csrv.URL, true))
 	srv = server.NewDefaultServer(manager)
 	srv.SetUserAuthorizationHandler(func(c context.Context, ctx *app.RequestContext) (userID string, err error) {
 		userID = "000000"
@@ -398,7 +408,7 @@ func TestRefreshing(t *testing.T) {
 		WithQuery("client_id", clientID).
 		WithQuery("scope", "all").
 		WithQuery("state", "123").
-		WithQuery("redirect_uri", url.QueryEscape(csrv.URL+"/oauth2")).
+		WithQuery("redirect_uri", csrv.URL+"/oauth2").
 		Expect().Status(http.StatusOK)
 }
 

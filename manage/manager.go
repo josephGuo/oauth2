@@ -163,7 +163,7 @@ func (m *Manager) GenerateAuthToken(ctx context.Context, rt oauth2.ResponseType,
 		UserID:    tgr.UserID,
 		CreateAt:  createAt,
 		TokenInfo: ti,
-		//Request:   tgr.Request,
+		Request:   tgr.Request,
 	}
 	switch rt {
 	case oauth2.Code:
@@ -296,6 +296,10 @@ func (m *Manager) GenerateAccessToken(ctx context.Context, gt oauth2.GrantType, 
 		}
 	}
 
+	if gt == oauth2.ClientCredentials && cli.IsPublic() == true {
+		return nil, errors.ErrInvalidClient
+	}
+
 	if gt == oauth2.AuthorizationCode {
 		ti, err := m.getAndDelAuthorizationCode(ctx, tgr)
 		if err != nil {
@@ -377,7 +381,7 @@ func (m *Manager) RefreshAccessToken(ctx context.Context, tgr *oauth2.TokenGener
 		UserID:    ti.GetUserID(),
 		CreateAt:  time.Now(),
 		TokenInfo: ti,
-		//Request:   tgr.Request,
+		Request:   tgr.Request,
 	}
 
 	rcfg := DefaultRefreshTokenCfg
